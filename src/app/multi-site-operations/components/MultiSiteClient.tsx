@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Phone, MapPin, Building2, Plus, ChevronRight } from 'lucide-react';
-import Link from 'next/link';
+import { Phone, MapPin, Building2, Plus } from 'lucide-react';
 import { siteService, complianceService, taskService } from '@/lib/services/dataService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ComplianceRing from '@/components/ui/ComplianceRing';
@@ -380,15 +379,6 @@ export default function MultiSiteClient() {
                   >
                     <Phone size={11} />
                   </a>
-                  <Link
-                    href={`/site-details/${site.id}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center justify-center rounded transition-all duration-150"
-                    style={{ width: 26, height: 26, background: 'var(--surface3)', color: 'var(--primary)', textDecoration: 'none' }}
-                    title="View site details"
-                  >
-                    <ChevronRight size={11} />
-                  </Link>
                 </div>
 
                 {isSelected && siteTasks.length > 0 && (
