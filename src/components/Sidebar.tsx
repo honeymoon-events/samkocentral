@@ -196,19 +196,24 @@ export default function Sidebar({ currentPath }: SidebarProps) {
           className="flex items-center gap-2 rounded-lg transition-all duration-150 group relative"
           style={{
             padding: '9px 10px',
-            color: 'var(--text2)',
+            background: currentPath === '/settings' ? 'rgba(232,201,122,0.12)' : 'transparent',
+            color: currentPath === '/settings' ? 'var(--primary)' : 'var(--text2)',
             fontSize: 13,
             fontWeight: 500,
             textDecoration: 'none',
             justifyContent: collapsed ? 'center' : 'flex-start',
           }}
           onMouseEnter={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'var(--surface2)';
-            (e.currentTarget as HTMLElement).style.color = 'var(--foreground)';
+            if (currentPath !== '/settings') {
+              (e.currentTarget as HTMLElement).style.background = 'var(--surface2)';
+              (e.currentTarget as HTMLElement).style.color = 'var(--foreground)';
+            }
           }}
           onMouseLeave={(e) => {
-            (e.currentTarget as HTMLElement).style.background = 'transparent';
-            (e.currentTarget as HTMLElement).style.color = 'var(--text2)';
+            if (currentPath !== '/settings') {
+              (e.currentTarget as HTMLElement).style.background = 'transparent';
+              (e.currentTarget as HTMLElement).style.color = 'var(--text2)';
+            }
           }}
         >
           <Settings size={17} className="flex-shrink-0" />

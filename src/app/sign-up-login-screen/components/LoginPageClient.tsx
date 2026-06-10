@@ -3,10 +3,10 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, ShieldCheck, Building2, FileText, ClipboardList, Copy, CheckCheck, AlertCircle, Loader2 } from 'lucide-react';
-import { MOCK_USERS } from '@/lib/mockData';
+import { Eye, EyeOff, ShieldCheck, Building2, FileText, ClipboardList, AlertCircle, Loader2 } from 'lucide-react';
 import AppLogo from '@/components/ui/AppLogo';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 type FormMode = 'login' | 'signup';
 
@@ -31,56 +31,45 @@ export default function LoginPageClient() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [copiedField, setCopiedField] = useState<string>('');
   const router = useRouter();
+  const { signIn, signUp } = useAuth();
 
   const loginForm = useForm<LoginFormValues>({
     defaultValues: { email: '', password: '', remember: false },
   });
 
   const signupForm = useForm<SignupFormValues>({
-    defaultValues: { name: '', email: '', password: '', confirmPassword: '', role: 'Site Manager', agreeTerms: false },
+    defaultValues: { name: '', email: '', password: '', confirmPassword: '', role: 'site_manager', agreeTerms: false },
   });
 
-  const handleCopy = (text: string, field: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopiedField(field);
-      setTimeout(() => setCopiedField(''), 2000);
-    });
-  };
-
-  const handleCredentialClick = (user: typeof MOCK_USERS[0]) => {
-    loginForm.setValue('email', user.email);
-    loginForm.setValue('password', user.password);
-    setAuthError('');
-  };
-
-  // Backend integration point: replace with real auth API call
   const handleLogin = loginForm.handleSubmit(async (data) => {
     setIsLoading(true);
     setAuthError('');
-    await new Promise((r) => setTimeout(r, 1200));
-    const matched = MOCK_USERS.find(
-      (u) => u.email === data.email && u.password === data.password
-    );
-    if (matched) {
-      toast.success(`Welcome back, ${matched.name.split(' ')[0]}`, {
-        description: `Signed in as ${matched.role}`,
-      });
+    try {
+      await signIn(data.email, data.password);
+      toast.success('Welcome back!', { description: 'Signed in successfully' });
       router.push('/');
-    } else {
-      setAuthError('Invalid credentials — use the demo accounts below to sign in');
+      router.refresh();
+    } catch (err: any) {
+      setAuthError(err?.message || 'Invalid email or password');
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   });
 
-  // Backend integration point: replace with real registration API call
   const handleSignup = signupForm.handleSubmit(async (data) => {
     setIsLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    toast.success('Account created — awaiting admin approval');
-    setMode('login');
-    setIsLoading(false);
+    setAuthError('');
+    try {
+      await signUp(data.email, data.password, { fullName: data.name, role: data.role });
+      toast.success('Account created!', { description: 'You are now signed in.' });
+      router.push('/');
+      router.refresh();
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to create account');
+    } finally {
+      setIsLoading(false);
+    }
   });
 
   return (
@@ -100,25 +89,16 @@ export default function LoginPageClient() {
           <div className="flex items-center gap-3 mb-12">
             <AppLogo size={36} />
             <div>
-              <div
-                className="font-head text-primary"
-                style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}
-              >
+              <div className="font-head text-primary" style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.3px' }}>
                 SamkoCentral
               </div>
-              <div
-                className="text-muted-foreground"
-                style={{ fontSize: 9, letterSpacing: '1.6px', textTransform: 'uppercase' }}
-              >
+              <div className="text-muted-foreground" style={{ fontSize: 9, letterSpacing: '1.6px', textTransform: 'uppercase' }}>
                 Operations · Compliance · Governance
               </div>
             </div>
           </div>
 
-          <h2
-            className="font-head text-foreground"
-            style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.2, marginBottom: 14 }}
-          >
+          <h2 className="font-head text-foreground" style={{ fontSize: 30, fontWeight: 800, lineHeight: 1.2, marginBottom: 14 }}>
             One platform.
             <br />
             <span className="text-gold">All your compliance.</span>
@@ -137,22 +117,13 @@ export default function LoginPageClient() {
               <div key={`feature-${i}`} className="flex items-start gap-3">
                 <div
                   className="flex items-center justify-center rounded-lg flex-shrink-0 mt-0.5"
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background: 'rgba(232,201,122,0.10)',
-                    color: 'var(--primary)',
-                  }}
+                  style={{ width: 32, height: 32, background: 'rgba(232,201,122,0.10)', color: 'var(--primary)' }}
                 >
                   {f.icon}
                 </div>
                 <div>
-                  <div className="text-foreground font-medium" style={{ fontSize: 13 }}>
-                    {f.title}
-                  </div>
-                  <div className="text-muted-foreground" style={{ fontSize: 12, marginTop: 1 }}>
-                    {f.desc}
-                  </div>
+                  <div className="text-foreground font-medium" style={{ fontSize: 13 }}>{f.title}</div>
+                  <div className="text-muted-foreground" style={{ fontSize: 12, marginTop: 1 }}>{f.desc}</div>
                 </div>
               </div>
             ))}
@@ -160,17 +131,8 @@ export default function LoginPageClient() {
         </div>
 
         <div>
-          <div
-            className="rounded-xl"
-            style={{
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              padding: '14px 16px',
-            }}
-          >
-            <div className="text-muted-foreground" style={{ fontSize: 11, marginBottom: 6 }}>
-              Currently monitoring
-            </div>
+          <div className="rounded-xl" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', padding: '14px 16px' }}>
+            <div className="text-muted-foreground" style={{ fontSize: 11, marginBottom: 6 }}>Currently monitoring</div>
             <div className="flex gap-6">
               {[
                 { val: '6', label: 'Sites' },
@@ -179,15 +141,8 @@ export default function LoginPageClient() {
                 { val: '8', label: 'Tasks' },
               ].map((s) => (
                 <div key={`stat-${s.label}`}>
-                  <div
-                    className="font-head text-primary tabular-nums"
-                    style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}
-                  >
-                    {s.val}
-                  </div>
-                  <div className="text-muted-foreground" style={{ fontSize: 11 }}>
-                    {s.label}
-                  </div>
+                  <div className="font-head text-primary tabular-nums" style={{ fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{s.val}</div>
+                  <div className="text-muted-foreground" style={{ fontSize: 11 }}>{s.label}</div>
                 </div>
               ))}
             </div>
@@ -201,16 +156,11 @@ export default function LoginPageClient() {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <AppLogo size={32} />
-            <span className="font-head text-primary" style={{ fontSize: 16, fontWeight: 800 }}>
-              SamkoCentral
-            </span>
+            <span className="font-head text-primary" style={{ fontSize: 16, fontWeight: 800 }}>SamkoCentral</span>
           </div>
 
           <div className="mb-8">
-            <h1
-              className="font-head text-foreground"
-              style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}
-            >
+            <h1 className="font-head text-foreground" style={{ fontSize: 24, fontWeight: 800, marginBottom: 6 }}>
               {mode === 'login' ? 'Sign in to your account' : 'Create an account'}
             </h1>
             <p className="text-muted-foreground" style={{ fontSize: 13 }}>
@@ -219,10 +169,7 @@ export default function LoginPageClient() {
           </div>
 
           {/* Mode toggle */}
-          <div
-            className="flex rounded-lg p-1 mb-7"
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
-          >
+          <div className="flex rounded-lg p-1 mb-7" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
             {(['login', 'signup'] as FormMode[]).map((m) => (
               <button
                 key={`mode-${m}`}
@@ -248,11 +195,7 @@ export default function LoginPageClient() {
           {authError && (
             <div
               className="flex items-start gap-3 rounded-lg mb-5"
-              style={{
-                background: 'var(--critical-bg)',
-                border: '1px solid rgba(244,63,94,0.25)',
-                padding: '11px 14px',
-              }}
+              style={{ background: 'var(--critical-bg)', border: '1px solid rgba(244,63,94,0.25)', padding: '11px 14px' }}
             >
               <AlertCircle size={15} style={{ color: 'var(--critical)', flexShrink: 0, marginTop: 1 }} />
               <p style={{ fontSize: 12, color: 'var(--critical)', lineHeight: 1.5 }}>{authError}</p>
@@ -263,9 +206,7 @@ export default function LoginPageClient() {
             <form onSubmit={handleLogin} noValidate>
               <div className="flex flex-col gap-5">
                 <div>
-                  <label className="samko-label" htmlFor="login-email">
-                    Email address
-                  </label>
+                  <label className="samko-label" htmlFor="login-email">Email address</label>
                   <input
                     id="login-email"
                     type="email"
@@ -278,30 +219,13 @@ export default function LoginPageClient() {
                     })}
                   />
                   {loginForm.formState.errors.email && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {loginForm.formState.errors.email.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{loginForm.formState.errors.email.message}</p>
                   )}
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="samko-label" htmlFor="login-password" style={{ margin: 0 }}>
-                      Password
-                    </label>
-                    <button
-                      type="button"
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--primary)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontFamily: 'var(--font-sans)',
-                      }}
-                    >
-                      Forgot password?
-                    </button>
+                    <label className="samko-label" htmlFor="login-password" style={{ margin: 0 }}>Password</label>
                   </div>
                   <div className="relative">
                     <input
@@ -320,22 +244,14 @@ export default function LoginPageClient() {
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
                       className="absolute right-3 top-1/2 -translate-y-1/2"
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text3)',
-                        padding: 2,
-                      }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
                   {loginForm.formState.errors.password && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {loginForm.formState.errors.password.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{loginForm.formState.errors.password.message}</p>
                   )}
                 </div>
 
@@ -358,23 +274,57 @@ export default function LoginPageClient() {
                   style={{ padding: '11px 0', fontSize: 14 }}
                 >
                   {isLoading ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Signing in…
-                    </>
+                    <><Loader2 size={15} className="animate-spin" />Signing in…</>
                   ) : (
                     'Sign in to SamkoCentral'
                   )}
                 </button>
+
+                {/* Demo credentials hint */}
+                <div className="rounded-xl" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', padding: '12px 14px' }}>
+                  <div className="text-muted-foreground font-head mb-2" style={{ fontSize: 10, letterSpacing: '1.2px', textTransform: 'uppercase' }}>
+                    Demo credentials
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {[
+                      { role: 'Group Admin', email: 'g.admin@samkocentral.co.uk', password: 'SamkoCentral2026!' },
+                      { role: 'Site Manager', email: 's.chen@samkocentral.co.uk', password: 'SiteManager2026!' },
+                      { role: 'Compliance Officer', email: 'c.officer@samkocentral.co.uk', password: 'Compliance2026!' },
+                    ].map((u) => (
+                      <button
+                        key={`demo-${u.role}`}
+                        type="button"
+                        onClick={() => {
+                          loginForm.setValue('email', u.email);
+                          loginForm.setValue('password', u.password);
+                          setAuthError('');
+                        }}
+                        className="flex items-center gap-2 rounded-lg text-left transition-all duration-150"
+                        style={{ padding: '6px 8px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--surface3)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+                      >
+                        <div
+                          className="rounded-full flex items-center justify-center font-head flex-shrink-0"
+                          style={{ width: 24, height: 24, background: 'rgba(232,201,122,0.12)', color: 'var(--primary)', fontSize: 8, fontWeight: 800 }}
+                        >
+                          {u.role.split(' ').map((w) => w[0]).join('')}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-foreground font-medium truncate" style={{ fontSize: 11 }}>{u.role}</div>
+                          <div className="text-muted-foreground truncate" style={{ fontSize: 10 }}>{u.email}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </form>
           ) : (
             <form onSubmit={handleSignup} noValidate>
               <div className="flex flex-col gap-4">
                 <div>
-                  <label className="samko-label" htmlFor="signup-name">
-                    Full name
-                  </label>
+                  <label className="samko-label" htmlFor="signup-name">Full name</label>
                   <input
                     id="signup-name"
                     type="text"
@@ -383,16 +333,12 @@ export default function LoginPageClient() {
                     {...signupForm.register('name', { required: 'Full name is required' })}
                   />
                   {signupForm.formState.errors.name && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {signupForm.formState.errors.name.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{signupForm.formState.errors.name.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="samko-label" htmlFor="signup-email">
-                    Work email address
-                  </label>
+                  <label className="samko-label" htmlFor="signup-email">Work email address</label>
                   <input
                     id="signup-email"
                     type="email"
@@ -404,35 +350,21 @@ export default function LoginPageClient() {
                     })}
                   />
                   {signupForm.formState.errors.email && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {signupForm.formState.errors.email.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{signupForm.formState.errors.email.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="samko-label" htmlFor="signup-role">
-                    Requested role
-                  </label>
-                  <select
-                    id="signup-role"
-                    className="samko-input"
-                    style={{ cursor: 'pointer' }}
-                    {...signupForm.register('role')}
-                  >
-                    <option value="Site Manager">Site Manager</option>
-                    <option value="Compliance Officer">Compliance Officer</option>
-                    <option value="Read Only">Read Only (Auditor)</option>
+                  <label className="samko-label" htmlFor="signup-role">Requested role</label>
+                  <select id="signup-role" className="samko-input" style={{ cursor: 'pointer' }} {...signupForm.register('role')}>
+                    <option value="site_manager">Site Manager</option>
+                    <option value="compliance_officer">Compliance Officer</option>
+                    <option value="read_only">Read Only (Auditor)</option>
                   </select>
-                  <p className="text-muted-foreground" style={{ fontSize: 11, marginTop: 5 }}>
-                    Group Admin access requires direct approval from the Group Operations Director
-                  </p>
                 </div>
 
                 <div>
-                  <label className="samko-label" htmlFor="signup-password">
-                    Password
-                  </label>
+                  <label className="samko-label" htmlFor="signup-password">Password</label>
                   <div className="relative">
                     <input
                       id="signup-password"
@@ -455,16 +387,12 @@ export default function LoginPageClient() {
                     </button>
                   </div>
                   {signupForm.formState.errors.password && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {signupForm.formState.errors.password.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{signupForm.formState.errors.password.message}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="samko-label" htmlFor="signup-confirm">
-                    Confirm password
-                  </label>
+                  <label className="samko-label" htmlFor="signup-confirm">Confirm password</label>
                   <div className="relative">
                     <input
                       id="signup-confirm"
@@ -474,8 +402,7 @@ export default function LoginPageClient() {
                       style={{ paddingRight: 42 }}
                       {...signupForm.register('confirmPassword', {
                         required: 'Please confirm your password',
-                        validate: (v) =>
-                          v === signupForm.watch('password') || 'Passwords do not match',
+                        validate: (v) => v === signupForm.watch('password') || 'Passwords do not match',
                       })}
                     />
                     <button
@@ -488,9 +415,7 @@ export default function LoginPageClient() {
                     </button>
                   </div>
                   {signupForm.formState.errors.confirmPassword && (
-                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>
-                      {signupForm.formState.errors.confirmPassword.message}
-                    </p>
+                    <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: 5 }}>{signupForm.formState.errors.confirmPassword.message}</p>
                   )}
                 </div>
 
@@ -509,9 +434,7 @@ export default function LoginPageClient() {
                   </label>
                 </div>
                 {signupForm.formState.errors.agreeTerms && (
-                  <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: -8 }}>
-                    {signupForm.formState.errors.agreeTerms.message}
-                  </p>
+                  <p style={{ fontSize: 11, color: 'var(--critical)', marginTop: -8 }}>{signupForm.formState.errors.agreeTerms.message}</p>
                 )}
 
                 <button
@@ -521,94 +444,13 @@ export default function LoginPageClient() {
                   style={{ padding: '11px 0', fontSize: 14 }}
                 >
                   {isLoading ? (
-                    <>
-                      <Loader2 size={15} className="animate-spin" />
-                      Creating account…
-                    </>
+                    <><Loader2 size={15} className="animate-spin" />Creating account…</>
                   ) : (
                     'Request access'
                   )}
                 </button>
               </div>
             </form>
-          )}
-
-          {/* Demo credentials */}
-          {mode === 'login' && (
-            <div
-              className="rounded-xl mt-7"
-              style={{
-                background: 'var(--surface2)',
-                border: '1px solid var(--border)',
-                padding: '14px 16px',
-              }}
-            >
-              <div
-                className="font-head text-muted-foreground mb-3"
-                style={{ fontSize: 10, letterSpacing: '1.2px', textTransform: 'uppercase' }}
-              >
-                Demo accounts — click to autofill
-              </div>
-              <div className="flex flex-col gap-1">
-                {MOCK_USERS.map((u) => (
-                  <div
-                    key={`cred-${u.role}`}
-                    className="flex items-center gap-3 rounded-lg cursor-pointer transition-all duration-150"
-                    style={{ padding: '8px 10px' }}
-                    onClick={() => handleCredentialClick(u)}
-                    onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = 'var(--surface3)';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.background = 'transparent';
-                    }}
-                  >
-                    <div
-                      className="rounded-full flex items-center justify-center font-head flex-shrink-0"
-                      style={{
-                        width: 26,
-                        height: 26,
-                        background: 'rgba(232,201,122,0.12)',
-                        color: 'var(--primary)',
-                        fontSize: 9,
-                        fontWeight: 800,
-                      }}
-                    >
-                      {u.initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-foreground font-medium truncate" style={{ fontSize: 12 }}>
-                        {u.role}
-                      </div>
-                      <div className="text-muted-foreground truncate" style={{ fontSize: 11 }}>
-                        {u.email}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCopy(u.email, `email-${u.role}`);
-                      }}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        color: 'var(--text3)',
-                        padding: 3,
-                      }}
-                      aria-label="Copy email"
-                    >
-                      {copiedField === `email-${u.role}` ? (
-                        <CheckCheck size={12} style={{ color: 'var(--ok)' }} />
-                      ) : (
-                        <Copy size={12} />
-                      )}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
           )}
         </div>
       </div>
