@@ -1,19 +1,20 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Phone, MapPin, Building2 } from 'lucide-react';
+import { Phone, MapPin, Building2, Plus } from 'lucide-react';
 import { siteService, complianceService, taskService } from '@/lib/services/dataService';
 import StatusBadge from '@/components/ui/StatusBadge';
 import ComplianceRing from '@/components/ui/ComplianceRing';
 import EmptyState from '@/components/ui/EmptyState';
+import Modal from '@/components/ui/Modal';
 
-type TypeFilter = 'All' | 'Hotel' | 'Restaurant';
+type TypeFilter = 'All' | 'Hotel' | 'Restaurant' | 'Bar';
 type RiskFilter = 'All' | 'high' | 'medium' | 'low';
 
 interface SiteData {
   id: string;
   name: string;
-  type: 'Hotel' | 'Restaurant';
+  type: 'Hotel' | 'Restaurant' | 'Bar';
   city: string;
   address: string;
   manager: string;
@@ -38,6 +39,26 @@ interface TaskData {
   status: string;
 }
 
+interface NewSiteForm {
+  name: string;
+  siteType: string;
+  city: string;
+  address: string;
+  managerName: string;
+  phone: string;
+}
+
+const SITE_TYPES = ['Hotel', 'Restaurant', 'Bar', 'Café', 'Pub', 'Club', 'Bistro', 'Other'];
+
+const emptyForm: NewSiteForm = {
+  name: '',
+  siteType: 'Hotel',
+  city: '',
+  address: '',
+  managerName: '',
+  phone: '',
+};
+
 export default function MultiSiteClient() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('All');
   const [riskFilter, setRiskFilter] = useState<RiskFilter>('All');
@@ -46,6 +67,10 @@ export default function MultiSiteClient() {
   const [compliance, setCompliance] = useState<ComplianceData[]>([]);
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [form, setForm] = useState<NewSiteForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -90,6 +115,54 @@ export default function MultiSiteClient() {
       : 0,
   };
 
+  const handleOpenCreate = () => {
+    setForm(emptyForm);
+    setFormError(null);
+    setShowCreateModal(true);
+  };
+
+  const handleCloseCreate = () => {
+    setShowCreateModal(false);
+    setFormError(null);
+  };
+
+  const handleFormChange = (field: keyof NewSiteForm, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateSite = async () => {
+    if (!form.name.trim()) { setFormError('Site name is required.'); return; }
+    if (!form.city.trim()) { setFormError('City is required.'); return; }
+    if (!form.address.trim()) { setFormError('Address is required.'); return; }
+    if (!form.managerName.trim()) { setFormError('Manager name is required.'); return; }
+    setFormError(null);
+    setSaving(true);
+    try {
+      const result = await siteService.create(form);
+      if (result) {
+        const newSite: SiteData = {
+          id: result.id,
+          name: result.name,
+          type: result.site_type as SiteData['type'],
+          city: result.city,
+          address: result.address,
+          manager: result.manager_name,
+          phone: result.phone || '',
+          status: result.status,
+          risk: result.risk,
+          openIssues: result.open_issues,
+          compliance: result.compliance_score,
+        };
+        setSites((prev) => [...prev, newSite]);
+      }
+      setShowCreateModal(false);
+    } catch {
+      setFormError('Failed to create site. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center" style={{ padding: 60 }}>
@@ -97,6 +170,27 @@ export default function MultiSiteClient() {
       </div>
     );
   }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'var(--surface2)',
+    border: '1px solid var(--border)',
+    borderRadius: 8,
+    color: 'var(--foreground)',
+    fontSize: 13,
+    padding: '9px 12px',
+    outline: 'none',
+  };
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 11,
+    fontWeight: 600,
+    color: 'var(--text2)',
+    marginBottom: 5,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  };
 
   return (
     <>
@@ -120,7 +214,7 @@ export default function MultiSiteClient() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters + Create button */}
       <div className="flex flex-wrap items-center gap-3 mb-5">
         <div className="flex gap-2">
           <span className="text-muted-foreground" style={{ fontSize: 12, alignSelf: 'center' }}>Type:</span>
@@ -138,9 +232,29 @@ export default function MultiSiteClient() {
             </button>
           ))}
         </div>
-        <p className="text-muted-foreground ml-auto" style={{ fontSize: 12 }}>
+        <p className="text-muted-foreground" style={{ fontSize: 12 }}>
           Showing <span style={{ color: 'var(--foreground)', fontWeight: 600 }}>{filtered.length}</span> of {sites.length} sites
         </p>
+        <button
+          onClick={handleOpenCreate}
+          className="flex items-center gap-2 ml-auto"
+          style={{
+            background: 'var(--primary)',
+            color: '#000',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Plus size={14} />
+          Create New Site
+        </button>
       </div>
 
       {/* Site cards grid */}
@@ -291,6 +405,137 @@ export default function MultiSiteClient() {
           })}
         </div>
       )}
+
+      {/* Create New Site Modal */}
+      <Modal
+        open={showCreateModal}
+        onClose={handleCloseCreate}
+        title="Register New Site"
+        subtitle="Add a new hotel, restaurant, bar or other venue to your group."
+        width={540}
+      >
+        <div className="flex flex-col gap-4">
+          {/* Site Name */}
+          <div>
+            <label style={labelStyle}>Site Name *</label>
+            <input
+              type="text"
+              placeholder="e.g. The Grand Hotel"
+              value={form.name}
+              onChange={(e) => handleFormChange('name', e.target.value)}
+              style={inputStyle}
+            />
+          </div>
+
+          {/* Site Type */}
+          <div>
+            <label style={labelStyle}>Site Type *</label>
+            <select
+              value={form.siteType}
+              onChange={(e) => handleFormChange('siteType', e.target.value)}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              {SITE_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* City + Address */}
+          <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label style={labelStyle}>City *</label>
+              <input
+                type="text"
+                placeholder="e.g. London"
+                value={form.city}
+                onChange={(e) => handleFormChange('city', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Address *</label>
+              <input
+                type="text"
+                placeholder="e.g. 12 High Street"
+                value={form.address}
+                onChange={(e) => handleFormChange('address', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Manager + Phone */}
+          <div className="grid gap-3" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div>
+              <label style={labelStyle}>Site Manager *</label>
+              <input
+                type="text"
+                placeholder="e.g. Jane Smith"
+                value={form.managerName}
+                onChange={(e) => handleFormChange('managerName', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Phone</label>
+              <input
+                type="tel"
+                placeholder="e.g. +44 20 1234 5678"
+                value={form.phone}
+                onChange={(e) => handleFormChange('phone', e.target.value)}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+
+          {/* Error */}
+          {formError && (
+            <div className="rounded-lg" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', padding: '10px 14px', fontSize: 12, color: 'var(--critical)' }}>
+              {formError}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-3 justify-end pt-2" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+            <button
+              onClick={handleCloseCreate}
+              disabled={saving}
+              style={{
+                background: 'var(--surface2)',
+                color: 'var(--text2)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                padding: '9px 18px',
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateSite}
+              disabled={saving}
+              style={{
+                background: saving ? 'var(--surface3)' : 'var(--primary)',
+                color: saving ? 'var(--text3)' : '#000',
+                border: 'none',
+                borderRadius: 8,
+                padding: '9px 20px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: saving ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              {saving ? 'Registering…' : 'Register Site'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </>
   );
 }

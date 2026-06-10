@@ -60,6 +60,38 @@ export const siteService = {
     const { error } = await supabase.from('sites').update(dbUpdates).eq('id', id);
     if (error && isSchemaError(error)) throw error;
   },
+
+  async create(site: {
+    name: string;
+    siteType: string;
+    city: string;
+    address: string;
+    managerName: string;
+    phone: string;
+  }) {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('sites')
+      .insert({
+        name: site.name,
+        site_type: site.siteType,
+        city: site.city,
+        address: site.address,
+        manager_name: site.managerName,
+        phone: site.phone,
+        status: 'operational',
+        risk: 'low',
+        open_issues: 0,
+        compliance_score: 100,
+      })
+      .select()
+      .single();
+    if (error) {
+      if (isSchemaError(error)) throw error;
+      return null;
+    }
+    return data;
+  },
 };
 
 // ─── DOCUMENTS ───────────────────────────────────────────────
